@@ -3,5 +3,5 @@
 @load frameworks/files/hash-all-files
 
 redef Intel::read_files += {
-	fmt("%s/xforce.dat", @DIR)
+        "/opt/bro/share/bro/policy/bro-xforce/xforce.dat"
 };

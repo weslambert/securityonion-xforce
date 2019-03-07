@@ -35,10 +35,11 @@ echo
 read -s XFORCEPASS
 
 # Configure connector
-echo "Configuring Bro OTX Connector..."
+echo "Configuring Bro X-Force Connector..."
 echo
 if [ -f $XFORCE_PATH/bro-xforce.conf ]; then
-	sed -i "s|api_key.*|api_key = $APIKEY|" $XFORCE_PATH/bro-xforce.conf
+	sed -i "s|apikey.*|apikey = $APIKEY|" $XFORCE_PATH/bro-xforce.conf
+        sed -i "s|password.*|password = $XFORCEPASS|" $XFORCE_PATH/bro-xforce.conf
 	sed -i "s|outfile.*|outfile = $XFORCE_PATH/xforce.dat|" $XFORCE_PATH/bro-xforce.conf
 fi 
 if [ -f $XFORCE_PATH/bro-xforce.py ];then
@@ -59,7 +60,7 @@ else
 fi
  
 # Run Pulse retrieval script for first time
-echo "Pulling OTX Pulses..."
+echo "Pulling X-Force data..."
 echo
 if [ -f $XFORCE_PATH/bro-xforce.py ]; then
 	/usr/bin/python $XFORCE_PATH/bro-xforce.py
