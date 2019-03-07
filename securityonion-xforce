@@ -1,0 +1,96 @@
+#!/bin/bash
+
+. /usr/sbin/so-common
+
+# If this is changed, you MUST manually update local.bro to the desired path
+XFORCE_PATH="/opt/bro/share/bro/policy/bro-xforce"
+
+# Download connector
+echo
+echo "Downloading Bro/X-Force Connector ..."
+echo
+if [ ! -d $XFORCE_PATH ]; then
+	git clone https://github.com/weslambert/securityonion-xforce $XFORCE_PATH
+else
+	echo "bro-xforce directory already exists!"
+fi
+cd $XFORCE_PATH
+if [ -d scripts ]; then
+	cp -av scripts/* .
+	rm -rf scripts
+fi 
+
+# Get apikey
+echo
+echo "Please provide an X-Force key! [ENTER]:"
+echo "(Input field is hidden)"
+echo
+read -s APIKEY
+
+# Get password
+echo
+echo "Please provide an X-Force password! [ENTER]:"
+echo "(Input field is hidden)"
+echo
+read -s XFORCEPASS
+
+# Configure connector
+echo "Configuring Bro OTX Connector..."
+echo
+if [ -f $XFORCE_PATH/bro-xforce.conf ]; then
+	sed -i "s|api_key.*|api_key = $APIKEY|" $XFORCE_PATH/bro-xforce.conf
+	sed -i "s|outfile.*|outfile = $XFORCE_PATH/xforce.dat|" $XFORCE_PATH/bro-xforce.conf
+fi 
+if [ -f $XFORCE_PATH/bro-xforce.py ];then
+	sed -i "s|default='bro-xforce.conf'|default='$XFORCE_PATH/bro-xforce.conf'|" $XFORCE_PATH/bro-xforce.py
+fi
+ 
+# Add to local.bro
+if [[ ! `grep bro-xforce /opt/bro/share/bro/site/local.bro` ]]; then
+        cp /opt/bro/share/bro/site/local.bro /opt/bro/share/bro/site/local.bro.bak
+        cat << EOF >> /opt/bro/share/bro/site/local.bro
+
+# Load X-Force threat data
+@load bro-xforce
+EOF
+
+else
+        echo "@load bro-xforce already exists in local.bro!"
+fi
+ 
+# Run Pulse retrieval script for first time
+echo "Pulling OTX Pulses..."
+echo
+if [ -f $XFORCE_PATH/bro-xforce.py ]; then
+	/usr/bin/python $XFORCE_PATH/bro-xforce.py
+fi
+
+# Add cron job
+echo "Adding cron job...will run hourly to pull new pulses"
+echo
+cat << EOF > /etc/cron.d/bro-xforce
+# /etc/cron.d/bro-xforce
+#
+# crontab entry to manage X-Force threat data updates
+ 
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+ 
+0 * * * * root python $XFORCE_PATH/bro-xforce.py >> /var/log/nsm/bro-xforce.log 2>&1
+EOF
+
+# Restart Bro 
+echo "Restarting Bro..."
+echo
+so-bro-restart
+echo "Done!"
+echo
+
+# Check if script(s) loaded
+if [[ `grep xforce /nsm/bro/logs/current/loaded_scripts.log` ]]; then
+	echo "Script(s) loaded!"
+	echo
+else
+	echo "There seems to be an issue with your configuration.  Check /nsm/bro/logs/current/reporter.log for clues."
+	echo
+fi
